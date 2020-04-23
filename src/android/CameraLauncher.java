@@ -20,9 +20,12 @@ package org.apache.cordova.camera;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.database.Cursor;
@@ -37,6 +40,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.util.Base64;
 
@@ -59,6 +63,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
+
+import static android.content.Context.ACTIVITY_SERVICE;
 
 /**
  * This class launches the camera view, allows the user to take a picture, closes the camera view,
@@ -66,7 +73,6 @@ import java.util.Date;
  * the camera view was shown is redisplayed.
  */
 public class CameraLauncher extends CordovaPlugin implements MediaScannerConnectionClient {
-
     private static final int DATA_URL = 0;              // Return base64 encoded string
     private static final int FILE_URI = 1;              // Return file uri (content://media/external/images/media/2 for Android)
     private static final int NATIVE_URI = 2;                    // On Android, this is the same as FILE_URI
@@ -95,7 +101,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
 
     private static final String TAKE_PICTURE_ACTION = "takePicture";
 
-    public static final int PERMISSION_DENIED_ERROR = 20;
+    public static final String PERMISSION_DENIED_ERROR = "show setting";
     public static final int TAKE_PIC_SEC = 0;
     public static final int SAVE_TO_ALBUM_SEC = 1;
 
@@ -192,7 +198,16 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                 else if ((this.srcType == PHOTOLIBRARY) || (this.srcType == SAVEDPHOTOALBUM)) {
                     // FIXME: Stop always requesting the permission
                     if(!PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)) {
-                        PermissionHelper.requestPermission(this, SAVE_TO_ALBUM_SEC, Manifest.permission.READ_EXTERNAL_STORAGE);
+                        SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
+                        // 不是第一次请求权限直接返回
+                        if (sp.getString("request","") == "true") {
+                            this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+                        } else {
+                            SharedPreferences.Editor editor = sp.edit();
+                            editor.putString("request", "true");
+                            editor.commit();
+                            PermissionHelper.requestPermission(this, SAVE_TO_ALBUM_SEC, Manifest.permission.READ_EXTERNAL_STORAGE);
+                        }
                     } else {
                         this.getImage(this.srcType, destType, encodingType);
                     }
@@ -281,12 +296,40 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         if (takePicturePermission && saveAlbumPermission) {
             takePicture(returnType, encodingType);
         } else if (saveAlbumPermission && !takePicturePermission) {
-            PermissionHelper.requestPermission(this, TAKE_PIC_SEC, Manifest.permission.CAMERA);
+            SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
+            // 不是第一次请求权限直接返回
+            if (sp.getString("request","") == "true") {
+                this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+            } else {
+                SharedPreferences.Editor editor = sp.edit();
+                editor.putString("request", "true");
+                editor.commit();
+                PermissionHelper.requestPermission(this, TAKE_PIC_SEC, Manifest.permission.CAMERA);
+            }
         } else if (!saveAlbumPermission && takePicturePermission) {
-            PermissionHelper.requestPermissions(this, TAKE_PIC_SEC,
-                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE});
+            SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
+            // 不是第一次请求权限直接返回
+            if (sp.getString("request","") == "true") {
+                this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+            } else {
+                SharedPreferences.Editor editor = sp.edit();
+                editor.putString("request", "true");
+                editor.commit();
+                PermissionHelper.requestPermissions(this, TAKE_PIC_SEC,
+                        new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE});
+            }
+
         } else {
-            PermissionHelper.requestPermissions(this, TAKE_PIC_SEC, permissions);
+            SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
+            // 不是第一次请求权限直接返回
+            if (sp.getString("request","") == "true") {
+                this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+            } else {
+                SharedPreferences.Editor editor = sp.edit();
+                editor.putString("request", "true");
+                editor.commit();
+                PermissionHelper.requestPermissions(this, TAKE_PIC_SEC, permissions);
+            }
         }
     }
 
@@ -1300,7 +1343,6 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         } catch (IllegalStateException e) {
             LOG.e(LOG_TAG, "Can't scan file in MediaScanner after taking picture");
         }
-
     }
 
     public void onScanCompleted(String path, Uri uri) {
@@ -1312,7 +1354,14 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                                           int[] grantResults) throws JSONException {
         for (int r : grantResults) {
             if (r == PackageManager.PERMISSION_DENIED) {
-                this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+                // 复选了不在询问
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(cordova.getActivity(), String.valueOf(r))){
+                    LOG.e(LOG_TAG, "PERMISSION_DENIED_ERROR  复选了不在询问 taking picture");
+                    this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "PERMISSION_DENIED_ERROR 复选了不在询问"));
+                } else {
+                    LOG.e(LOG_TAG, "PERMISSION_DENIED_ERROR taking picture");
+                    this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "PERMISSION_DENIED_ERROR"));
+                }  
                 return;
             }
         }
@@ -1399,4 +1448,5 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         String path = external_storage.getAbsolutePath() + partial_path;
         return path;
     }
+
 }
