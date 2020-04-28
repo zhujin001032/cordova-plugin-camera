@@ -43,6 +43,7 @@ import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.FileProvider;
 import android.util.Base64;
+import android.util.Log;
 
 import org.apache.cordova.BuildHelper;
 import org.apache.cordova.CallbackContext;
@@ -200,7 +201,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                     if(!PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)) {
                         SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
                         // 不是第一次请求权限直接返回
-                        if (sp.getString("request","") == "true") {
+                        if (sp.getString("request","").equals("true") ) {
                             this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
                         } else {
                             SharedPreferences.Editor editor = sp.edit();
@@ -298,7 +299,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         } else if (saveAlbumPermission && !takePicturePermission) {
             SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
             // 不是第一次请求权限直接返回
-            if (sp.getString("request","") == "true") {
+            if (sp.getString("request","").equals("true") ) {
                 this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
             } else {
                 SharedPreferences.Editor editor = sp.edit();
@@ -309,7 +310,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         } else if (!saveAlbumPermission && takePicturePermission) {
             SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
             // 不是第一次请求权限直接返回
-            if (sp.getString("request","") == "true") {
+            if (sp.getString("request","").equals("true") ) {
                 this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
             } else {
                 SharedPreferences.Editor editor = sp.edit();
@@ -322,7 +323,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         } else {
             SharedPreferences sp = cordova.getContext().getSharedPreferences("Camera", Context.MODE_PRIVATE);
             // 不是第一次请求权限直接返回
-            if (sp.getString("request","") == "true") {
+            if (sp.getString("request","").equals("true") ) {
                 this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
             } else {
                 SharedPreferences.Editor editor = sp.edit();
@@ -1352,26 +1353,32 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
 
     public void onRequestPermissionResult(int requestCode, String[] permissions,
                                           int[] grantResults) throws JSONException {
-        for (int r : grantResults) {
-            if (r == PackageManager.PERMISSION_DENIED) {
-                // 复选了不在询问
-                if (!ActivityCompat.shouldShowRequestPermissionRationale(cordova.getActivity(), String.valueOf(r))){
-                    LOG.e(LOG_TAG, "PERMISSION_DENIED_ERROR  复选了不在询问 taking picture");
-                    this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "PERMISSION_DENIED_ERROR 复选了不在询问"));
-                } else {
-                    LOG.e(LOG_TAG, "PERMISSION_DENIED_ERROR taking picture");
-                    this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "PERMISSION_DENIED_ERROR"));
-                }  
-                return;
+        try {
+            for(int i=0;i<grantResults.length;i++){
+                if (grantResults[i] == PackageManager.PERMISSION_DENIED) {
+
+                    // 复选了不在询问
+                    if (!ActivityCompat.shouldShowRequestPermissionRationale(cordova.getActivity(), permissions[i])) {
+                        LOG.e(LOG_TAG, "PERMISSION_DENIED_ERROR  复选了不在询问 taking picture");
+                        this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "PERMISSION_DENIED_ERROR 复选了不在询问"));
+                    } else {
+                        LOG.e(LOG_TAG, "PERMISSION_DENIED_ERROR taking picture");
+                        this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, "PERMISSION_DENIED_ERROR"));
+                    }
+
+                    return;
+                }
             }
-        }
-        switch (requestCode) {
-            case TAKE_PIC_SEC:
-                takePicture(this.destType, this.encodingType);
-                break;
-            case SAVE_TO_ALBUM_SEC:
-                this.getImage(this.srcType, this.destType, this.encodingType);
-                break;
+            switch (requestCode) {
+                case TAKE_PIC_SEC:
+                    takePicture(this.destType, this.encodingType);
+                    break;
+                case SAVE_TO_ALBUM_SEC:
+                    this.getImage(this.srcType, this.destType, this.encodingType);
+                    break;
+            }
+        } catch (Exception e) {
+            Log.e("Camera", e.getMessage());
         }
     }
 
