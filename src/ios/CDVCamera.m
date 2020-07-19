@@ -81,7 +81,8 @@ static NSString* toBase64(NSData* data) {
     pictureOptions.saveToPhotoAlbum = [[command argumentAtIndex:9 withDefault:@(NO)] boolValue];
     pictureOptions.popoverOptions = [command argumentAtIndex:10 withDefault:nil];
     pictureOptions.cameraDirection = [[command argumentAtIndex:11 withDefault:@(UIImagePickerControllerCameraDeviceRear)] unsignedIntegerValue];
-
+    pictureOptions.waterString = [command argumentAtIndex:12 withDefault:nil];
+    pictureOptions.dateFormat = [command argumentAtIndex:13 withDefault:nil];
     pictureOptions.popoverSupported = NO;
     pictureOptions.usesGeolocation = NO;
 
@@ -467,6 +468,11 @@ static NSString* toBase64(NSData* data) {
             // In this case we must save image to device before obtaining an URI.
             if (url == nil) {
                 image = [self retrieveImage:info options:options];
+                
+                //add water string & date time by jason he 2020/7/18
+                image = [self addTextWatermark:image withWaterString: options.waterString withDateFormat:options.dateFormat];
+                //end
+                
                 ALAssetsLibrary* library = [ALAssetsLibrary new];
                 [library writeImageToSavedPhotosAlbum:image.CGImage orientation:(ALAssetOrientation)(image.imageOrientation) completionBlock:^(NSURL *assetURL, NSError *error) {
                     CDVPluginResult* resultToReturn = nil;
@@ -480,6 +486,7 @@ static NSString* toBase64(NSData* data) {
                 }];
                 return;
             } else {
+                // TODO: add waterString mark
                 NSString* nativeUri = [[self urlTransformer:url] absoluteString];
                 result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:nativeUri];
             }
@@ -488,6 +495,10 @@ static NSString* toBase64(NSData* data) {
         case DestinationTypeFileUri:
         {
             image = [self retrieveImage:info options:options];
+            
+            //add water string & date time by jason he 2020/7/18
+            image = [self addTextWatermark:image withWaterString: options.waterString withDateFormat:options.dateFormat];
+            
             NSData* data = [self processImage:image info:info options:options];
             if (data) {
 
@@ -507,6 +518,8 @@ static NSString* toBase64(NSData* data) {
         case DestinationTypeDataUrl:
         {
             image = [self retrieveImage:info options:options];
+           //add water string & date time by jason he 2020/7/18
+            image = [self addTextWatermark:image withWaterString: options.waterString withDateFormat:options.dateFormat];
             NSData* data = [self processImage:image info:info options:options];
             if (data)  {
                 result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:toBase64(data)];
@@ -798,5 +811,52 @@ static NSString* toBase64(NSData* data) {
 
     return cameraPicker;
 }
-
+//添加水印 by jason he 2020/7/18
+-(UIImage *)addTextWatermark:(UIImage *)img withWaterString:(NSString *)waterString withDateFormat:(NSString *)dateFormat
+{
+    
+    NSLog(@"waterString =  %@/n",waterString);
+    NSLog(@"dateFormat =  %@/n",dateFormat);
+    
+    if ((waterString == nil && dateFormat == nil) ||
+        ([ waterString isEqualToString: @""] && [dateFormat isEqualToString:@""]) ||
+        ([ waterString isEqualToString: @"null"] && [dateFormat isEqualToString:@"null"])){
+        return img;
+    }
+    
+    int w = img.size.width;
+    int h = img.size.height;
+    //UIGraphicsBeginImageContext创建一个基于位图的上下文(context),并将其设置为当前上下文(context)
+    UIGraphicsBeginImageContext(img.size);
+    
+    [img drawInRect:CGRectMake(0, 0, w, h)];
+    
+    
+    NSDictionary *waterAttr = @{NSFontAttributeName: [UIFont boldSystemFontOfSize:60],   //设置字体
+                               NSForegroundColorAttributeName : [UIColor redColor]      //设置字体颜色
+                               };
+    
+    if (waterString != nil && ![waterString isEqualToString:@"null"]) {
+        [waterString drawInRect:CGRectMake(80, h - 180, w - 100, 70) withAttributes:waterAttr];
+    }
+    if (dateFormat != nil && ![dateFormat isEqualToString:@"null"]) {
+        [dateFormat drawInRect:CGRectMake(80, h - 110, w - 100, 70) withAttributes:waterAttr];
+    }
+    
+    
+    UIImage *newImg = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return newImg;
+}
+//获取当前的时间
++(NSString*)getCurrentTimes:(NSString *)format{
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    // 设置你想要的格式,hh与HH的区别:分别表示12小时制,24小时制
+//    [formatter setDateFormat:@"时间：YYYY-MM-dd HH:mm:ss"];
+    [formatter setDateFormat:format];
+    NSDate *datenow = [NSDate date];
+    NSString *currentTimeString = [formatter stringFromDate:datenow];
+    NSLog(@"currentTimeString =  %@",currentTimeString);
+    return currentTimeString;
+}
 @end

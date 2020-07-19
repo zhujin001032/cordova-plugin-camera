@@ -55,7 +55,8 @@ typedef NSUInteger CDVMediaType;
 @property (assign) BOOL saveToPhotoAlbum;
 @property (strong) NSDictionary* popoverOptions;
 @property (assign) UIImagePickerControllerCameraDevice cameraDirection;
-
+@property (strong) NSString* waterString;
+@property (strong) NSString* dateFormat;
 @property (assign) BOOL popoverSupported;
 @property (assign) BOOL usesGeolocation;
 @property (assign) BOOL cropToSize;
@@ -95,11 +96,11 @@ typedef NSUInteger CDVMediaType;
  * getPicture
  *
  * arguments:
- *	1: this is the javascript function that will be called with the results, the first parameter passed to the
- *		javascript function is the picture as a Base64 encoded string
+ *    1: this is the javascript function that will be called with the results, the first parameter passed to the
+ *        javascript function is the picture as a Base64 encoded string
  *  2: this is the javascript function to be called if there was an error
  * options:
- *	quality: integer between 1 and 100
+ *    quality: integer between 1 and 100
  */
 - (void)takePicture:(CDVInvokedUrlCommand*)command;
 - (void)cleanup:(CDVInvokedUrlCommand*)command;
@@ -112,5 +113,7 @@ typedef NSUInteger CDVMediaType;
 
 - (void)locationManager:(CLLocationManager*)manager didUpdateToLocation:(CLLocation*)newLocation fromLocation:(CLLocation*)oldLocation;
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error;
+- (UIImage *)addTextWatermark:(UIImage *)img withWaterString:(NSString *)waterString withDateFormat:(NSString *)dateFormat;
++ (NSString*)getCurrentTimes:(NSString *)format;
 
 @end

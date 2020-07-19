@@ -32,7 +32,11 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.CompressFormat;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.media.ExifInterface;
 import android.media.MediaScannerConnection;
 import android.media.MediaScannerConnection.MediaScannerConnectionClient;
@@ -125,6 +129,9 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
     private boolean correctOrientation;     // Should the pictures orientation be corrected
     private boolean orientationCorrected;   // Has the picture's orientation been corrected
     private boolean allowEdit;              // Should we allow the user to crop the image.
+    private String waterString;             // add text water mark to the image.
+    private String dateTimeFormat;         // Should we allow  add data time  water mark to the image. crop the image.
+
 
     protected final static String[] permissions = { Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE };
 
@@ -175,6 +182,8 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
             this.allowEdit = args.getBoolean(7);
             this.correctOrientation = args.getBoolean(8);
             this.saveToPhotoAlbum = args.getBoolean(9);
+            this.waterString = args.getString(12);
+            this.dateTimeFormat = args.getString(13);
 
             // If the user specifies a 0 or smaller width/height
             // make it -1 so later comparisons succeed
@@ -571,6 +580,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                 return;
             }
 
+            bitmap =  addTextWatermark(bitmap, waterString ,dateTimeFormat);
 
             this.processPicture(bitmap, this.encodingType);
 
@@ -602,6 +612,7 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
 
                     this.callbackContext.success(uri.toString());
                 }
+                // TODO Add water mark
             } else {
                 Uri uri = Uri.fromFile(createCaptureFile(this.encodingType, System.currentTimeMillis() + ""));
                 bitmap = getScaledAndRotatedBitmap(sourcePath);
@@ -613,12 +624,16 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
                     return;
                 }
 
+                //add water string & date time by jason he 2020/7/18
+                bitmap =  addTextWatermark(bitmap, waterString ,dateTimeFormat);
+
 
                 // Add compressed version of captured image to returned media store Uri
                 OutputStream os = this.cordova.getActivity().getContentResolver().openOutputStream(uri);
                 CompressFormat compressFormat = encodingType == JPEG ?
                         CompressFormat.JPEG :
                         CompressFormat.PNG;
+
 
                 bitmap.compress(compressFormat, this.mQuality, os);
                 os.close();
@@ -1455,5 +1470,59 @@ public class CameraLauncher extends CordovaPlugin implements MediaScannerConnect
         String path = external_storage.getAbsolutePath() + partial_path;
         return path;
     }
+    /**
+     * Bitmap对象是否为空。
+     */
+    private static boolean isEmptyBitmap(Bitmap src) {
+        return src == null || src.getWidth() == 0 || src.getHeight() == 0;
+    }
 
+    /**
+     * 给一张Bitmap添加水印文字。
+     *
+     * @param bitmap   源图片
+     * @param dataStr  水印文本
+     *
+     * @return 已经添加水印后的Bitmap。
+     */
+    private static Bitmap addTextWatermark(Bitmap bitmap, String dataStr,String dateTimeFormat) {
+
+        if (isEmptyBitmap(bitmap)) {
+            return null;
+        }
+        if  (dataStr.length() == 0 || dataStr.equals("null") && dateTimeFormat.length() == 0 || dateTimeFormat.equals("null")){
+            return bitmap;
+        }
+
+        float x = 80.0f;
+        float y = bitmap.getHeight();
+
+        Bitmap ret = bitmap.copy(bitmap.getConfig(), true);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        Canvas canvas = new Canvas(ret);
+        paint.setColor(Color.RED);
+        paint.setStrokeWidth(2);
+        Rect bounds = new Rect();
+
+
+        if  (dataStr.length() > 0 && !dataStr.equals("null") ){
+            //绘制文本
+            paint.setTextSize(60.0f);
+            paint.getTextBounds(dataStr, 0, dataStr.length(), bounds);
+            canvas.drawText(dataStr, x, y - 180, paint);
+        }
+
+        if (dateTimeFormat.length() > 0 &&  !dateTimeFormat.equals("null")){
+            //绘制时间
+            String timeStamp = new SimpleDateFormat(dateTimeFormat).format(new Date());
+
+            paint.setTextSize(60.0f);
+            paint.getTextBounds(timeStamp, 0, timeStamp.length(), bounds);
+            y = bitmap.getHeight() - 110;
+            canvas.drawText(timeStamp, x, y, paint);
+        }
+
+        bitmap.recycle();
+        return ret;
+    }
 }
