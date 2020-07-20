@@ -380,6 +380,7 @@ static NSString* toBase64(NSData* data) {
             } else {
                 data = UIImageJPEGRepresentation(image, [options.quality floatValue] / 100.0f);
             }
+            
 
             if (options.usesGeolocation) {
                 NSDictionary* controllerMetadata = [info objectForKey:@"UIImagePickerControllerMediaMetadata"];
@@ -765,7 +766,55 @@ static NSString* toBase64(NSData* data) {
         [library writeImageDataToSavedPhotosAlbum:self.data metadata:self.metadata completionBlock:nil];
     }
 }
-
+//添加水印 by jason he 2020/7/18
+-(UIImage *)addTextWatermark:(UIImage *)img withWaterString:(NSString *)waterString withDateFormat:(NSString *)dateFormat
+{
+    
+    NSLog(@"waterString =  %@/n",waterString);
+    NSLog(@"dateFormat =  %@/n",dateFormat);
+    
+    if ((waterString == nil && dateFormat == nil) ||
+        ([ waterString isEqualToString: @""] && [dateFormat isEqualToString:@""]) ||
+        ([ waterString isEqualToString: @"null"] && [dateFormat isEqualToString:@"null"])){
+        return img;
+    }
+    
+    int w = img.size.width*0.5;
+    int h = img.size.height*0.5;
+    //UIGraphicsBeginImageContext创建一个基于位图的上下文(context),并将其设置为当前上下文(context)
+    UIGraphicsBeginImageContext(CGSizeMake(w, h));
+    
+    [img drawInRect:CGRectMake(0, 0, w, h)];
+    
+    
+    NSDictionary *waterAttr = @{NSFontAttributeName: [UIFont boldSystemFontOfSize:60],   //设置字体
+                               NSForegroundColorAttributeName : [UIColor redColor]      //设置字体颜色
+                               };
+    
+    if (waterString != nil && ![waterString isEqualToString:@"null"]) {
+        [waterString drawInRect:CGRectMake(80, h - 180, w - 100, 70) withAttributes:waterAttr];
+    }
+    if (dateFormat != nil && ![dateFormat isEqualToString:@"null"]) {
+        
+        [[CDVCamera getCurrentTimes:dateFormat] drawInRect:CGRectMake(80, h - 110, w - 100, 70) withAttributes:waterAttr];
+    }
+    
+    
+    UIImage *newImg = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return newImg;
+}
+//获取当前的时间
++(NSString*)getCurrentTimes:(NSString *)format{
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    // 设置你想要的格式,hh与HH的区别:分别表示12小时制,24小时制
+//    [formatter setDateFormat:@"时间：YYYY-MM-dd HH:mm:ss"];
+    [formatter setDateFormat:format];
+    NSDate *datenow = [NSDate date];
+    NSString *currentTimeString = [formatter stringFromDate:datenow];
+    NSLog(@"currentTimeString =  %@",currentTimeString);
+    return currentTimeString;
+}
 @end
 
 @implementation CDVCameraPicker
@@ -811,52 +860,5 @@ static NSString* toBase64(NSData* data) {
 
     return cameraPicker;
 }
-//添加水印 by jason he 2020/7/18
--(UIImage *)addTextWatermark:(UIImage *)img withWaterString:(NSString *)waterString withDateFormat:(NSString *)dateFormat
-{
-    
-    NSLog(@"waterString =  %@/n",waterString);
-    NSLog(@"dateFormat =  %@/n",dateFormat);
-    
-    if ((waterString == nil && dateFormat == nil) ||
-        ([ waterString isEqualToString: @""] && [dateFormat isEqualToString:@""]) ||
-        ([ waterString isEqualToString: @"null"] && [dateFormat isEqualToString:@"null"])){
-        return img;
-    }
-    
-    int w = img.size.width;
-    int h = img.size.height;
-    //UIGraphicsBeginImageContext创建一个基于位图的上下文(context),并将其设置为当前上下文(context)
-    UIGraphicsBeginImageContext(img.size);
-    
-    [img drawInRect:CGRectMake(0, 0, w, h)];
-    
-    
-    NSDictionary *waterAttr = @{NSFontAttributeName: [UIFont boldSystemFontOfSize:60],   //设置字体
-                               NSForegroundColorAttributeName : [UIColor redColor]      //设置字体颜色
-                               };
-    
-    if (waterString != nil && ![waterString isEqualToString:@"null"]) {
-        [waterString drawInRect:CGRectMake(80, h - 180, w - 100, 70) withAttributes:waterAttr];
-    }
-    if (dateFormat != nil && ![dateFormat isEqualToString:@"null"]) {
-        [dateFormat drawInRect:CGRectMake(80, h - 110, w - 100, 70) withAttributes:waterAttr];
-    }
-    
-    
-    UIImage *newImg = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    return newImg;
-}
-//获取当前的时间
-+(NSString*)getCurrentTimes:(NSString *)format{
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    // 设置你想要的格式,hh与HH的区别:分别表示12小时制,24小时制
-//    [formatter setDateFormat:@"时间：YYYY-MM-dd HH:mm:ss"];
-    [formatter setDateFormat:format];
-    NSDate *datenow = [NSDate date];
-    NSString *currentTimeString = [formatter stringFromDate:datenow];
-    NSLog(@"currentTimeString =  %@",currentTimeString);
-    return currentTimeString;
-}
+
 @end
